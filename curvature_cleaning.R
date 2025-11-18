@@ -28,8 +28,36 @@ write.csv(master_df, "C:/Users/apc12/Desktop/ExperimentData/AllParticipants_comb
 head(master_df)
 
 data <- read.csv("C:/Users/apc12/Desktop/ExperimentData/AllParticipants_combined.csv")
-head(data)
-str(data)
+
+#remove duplicate trial answers - keep smallest angle entry
+data_unique <- data %>%
+  group_by(ParticipantNumber, ConditionID) %>%
+  arrange(MeasuredAngle, desc(Time), .by_group = TRUE) %>%
+  slice(1) %>%         
+  ungroup()
+
+subject_means <- data_unique %>%
+  group_by(ParticipantNumber) %>%
+  summarise(
+    mean_Time         = mean(Time, na.rm = TRUE),
+    mean_TrialNumber  = mean(TrialNumber, na.rm = TRUE),
+    mean_Distance     = mean(Distance, na.rm = TRUE),
+    mean_StartAngle   = mean(StartAngle, na.rm = TRUE),
+    mean_MeasuredAngle = mean(MeasuredAngle, na.rm = TRUE),
+    mean_HMDHeight    = mean(HMDHeight, na.rm = TRUE),
+    n_conditions      = n()   #should be 60
+  )
+
+
+
+
+
+
+
+
+
+
+
 
 #mean of each column per participant
 subject_means <- data %>%
