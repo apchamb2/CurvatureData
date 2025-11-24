@@ -1,6 +1,6 @@
 library(dplyr)
 
-data_dir <- "C:/Users/apc12/Desktop/ExperimentData"
+data_dir <- "C:/Users/apc12/Desktop/CurvatureData"
 
 files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
 files <- files[order(files)]
@@ -27,7 +27,7 @@ write.csv(master_df, "C:/Users/apc12/Desktop/ExperimentData/AllParticipants_comb
           row.names = FALSE)
 head(master_df)
 
-data <- read.csv("C:/Users/apc12/Desktop/ExperimentData/AllParticipants_combined.csv")
+data <- read.csv("C:/Users/apc12/Desktop/CurvatureData/AllParticipants_uniqueTrials.csv")
 
 #remove duplicate trial answers - keep smallest angle entry
 data_unique <- data %>%
@@ -48,14 +48,19 @@ subject_means <- data_unique %>%
     n_conditions      = n()   #should be 60
   )
 
+#find outliers
+data_with_flags <- data_unique %>%
+  group_by(ParticipantNumber) %>%
+  mutate(
+    angle_z = scale(MeasuredAngle),
+    angle_outlier = abs(angle_z) > 3
+  )
 
+data_with_flags %>% filter(angle_outlier)
 
-
-
-
-
-
-
+#deleted measured angle value for incident with one subject using wrong end of pointer forone trial
+data %>% 
+  filter(!(ParticipantNumber == 11 & ConditionID == 19))
 
 
 
@@ -66,5 +71,13 @@ subject_means <- data %>%
     across(where(is.numeric), ~ mean(.x, na.rm = TRUE))
   )
 print(subject_means)
+
+
+
+
+
+
+
+
 
 
