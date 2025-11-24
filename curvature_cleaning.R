@@ -73,11 +73,78 @@ subject_means <- data %>%
 print(subject_means)
 
 
+# Data analysis 
+
+install.packages("BayesFactor")
+library(BayesFactor)
+library(dplyr)
+
+data <- data %>%
+  mutate(
+    Error = MeasuredAngle,        # signed error
+    AbsError = abs(MeasuredAngle) # absolute val
+  )
+
+within_subject_means <- data %>%
+  group_by(ParticipantNumber) %>%
+  summarise(
+    mean_Error = mean(Error, na.rm = TRUE),
+    mean_AbsError = mean(abs(Error), na.rm = TRUE),
+    n_trials = n()
+  )
+print(within_subject_means)
+
+bf_error <- ttestBF(
+  x = subject_means$mean_Error,
+  mu = 0
+)
+bf_error
+
+
+within_subject_by_distance <- data %>%
+  group_by(ParticipantNumber, Distance) %>%   # <-- subject × distance
+  summarise(
+    mean_Error = mean(Error, na.rm = TRUE),
+    mean_AbsError = mean(AbsError, na.rm = TRUE),
+    n_trials = n()
+  ) %>%
+  ungroup()
+print(within_subject_by_distance)
+
+within_subject_by_distance <- within_subject_by_distance %>%
+  mutate(
+    ParticipantNumber = factor(ParticipantNumber),
+    Distance = factor(Distance)   # treat distances as categorical levels
+  )
 
 
 
+library(BayesFactor)
+
+bf_distance <- anovaBF(
+  mean_Error ~ Distance + ParticipantNumber,
+  data = within_subject_by_distance,
+  whichRandom = "ParticipantNumber"
+)
+bf_distance
 
 
+library(ggplot2)
 
+ggplot(within_subject_by_distance, aes(x = Distance, y = mean_Error, group = ParticipantNumber)) +
+  geom_line(alpha = 0.4) +
+  geom_point(size = 2) +
+  stat_summary(fun = mean, geom = "line", linewidth = 1.2, color = "blue") +
+  labs(
+    title = "Within-Subject Mean Error by Distance",
+    subtitle = "Red line = Group Mean"
+  )
 
+within_subject_by_distance %>%
+  group_by(Distance) %>%
+  summarise(group_mean = mean(mean_Error), group_sd = sd(mean_Error))
+
+data %>%
+  group_by(ParticipantNumber, Distance) %>%
+  summarise(sd = sd(Error))
 
