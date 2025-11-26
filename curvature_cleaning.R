@@ -1,6 +1,9 @@
 library(dplyr)
+library(BayesFactor)
+library(BayesFactor)
 
 data_dir <- "C:/Users/apc12/Desktop/CurvatureData"
+output_dir <- "C:/Users/apc12/Desktop/ExperimentData"
 
 files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
 files <- files[order(files)]
@@ -8,6 +11,12 @@ get_participant_number <- function(filepath) {
      fname <- basename(filepath)                 # get filename only
      part_num <- substr(fname, 1, 2)             # first two characters
      return(part_num)
+}
+
+get_participant_number <- function(filepath) {
+  fname <- basename(filepath)
+  part_num <- substr(fname, 1, 2)
+  return(part_num)
 }
 
 master_df <- read.csv(files[1], header = TRUE)
