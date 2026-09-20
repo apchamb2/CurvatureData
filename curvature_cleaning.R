@@ -1,6 +1,6 @@
 library(dplyr)
 
-data_dir <- "C:/Users/apc12/Desktop/ExperimentData"
+data_dir <- "C:/Your/Path"
 
 files <- list.files(data_dir, pattern = "\\.csv$", full.names = TRUE)
 files <- files[order(files)]
