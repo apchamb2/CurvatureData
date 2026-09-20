@@ -1,0 +1,210 @@
+library(dplyr)
+library(ggplot2)
+library(BayesFactor)
+library(lsr)
+library(rstatix)
+library(emmeans)
+library(buildmer)
+library(lme4)
+
+# df <- read.csv("path/to/data.csv")
+
+# subject means
+subject_means <- df %>%
+  group_by(ParticipantNumber) %>%
+  summarise(
+    mean_Error    = mean(Error,    na.rm = TRUE),
+    mean_AbsError = mean(AbsError, na.rm = TRUE),
+    mean_Time     = mean(Time,     na.rm = TRUE),
+    mean_HMDHeight = mean(HMDHeight, na.rm = TRUE),
+    n_trials      = n(),
+    .groups = "drop"
+  )
+print(subject_means, n = 30)
+
+# Subject means by distance
+subject_distance_means <- df %>%
+  group_by(ParticipantNumber, Distance) %>%
+  summarise(
+    mean_Error    = mean(Error,    na.rm = TRUE),
+    mean_AbsError = mean(AbsError, na.rm = TRUE),
+    sd_Error      = sd(Error,      na.rm = TRUE),
+    n_trials      = n(),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    ParticipantNumber = factor(ParticipantNumber),
+    Distance          = factor(Distance)
+  )
+print(subject_distance_means)
+
+# Group means by distance
+distance_summary <- subject_distance_means %>%
+  group_by(Distance) %>%
+  summarise(
+    group_mean_Error = mean(mean_Error),
+    group_sd_Error   = sd(mean_Error),
+    group_se_Error   = sd(mean_Error) / sqrt(n()),
+    .groups = "drop"
+  )
+print(distance_summary)
+
+
+
+# Bayesian t-test: Mean error from zero
+bf_error <- ttestBF(x = subject_means$mean_Error, mu = 0, rscale = "wide")
+print(bf_error)
+
+# One-sample t-test per distance level
+bf_by_distance <- subject_distance_means %>%
+  group_by(Distance) %>%
+  summarise(BF = extractBF(ttestBF(mean_Error, mu = 0, rscale = "wide"))$bf,
+            .groups = "drop")
+print(bf_by_distance)
+
+# Cohen's d per distance level
+d_by_distance <- subject_distance_means %>%
+  group_by(Distance) %>%
+  summarise(d = cohensD(mean_Error, mu = 0), .groups = "drop")
+print(d_by_distance)
+
+# Bayesian repeated-measures ANOVA: effect of Distance
+bf_distance <- anovaBF(
+  mean_Error ~ Distance + ParticipantNumber,
+  data        = subject_distance_means,
+  whichRandom = "ParticipantNumber"
+)
+print(bf_distance)
+
+
+#mixed-effect models
+
+m <- lmer(MeasuredAngle ~ Distance + (1 | ParticipantNumber), data = df)
+summary(m)
+
+# estimated marginal mean errors at each distance
+emm <- emmeans(m, ~ Distance, lmer.df = "kenward-roger")
+summary(emm, infer = TRUE)
+
+emm_2 <- emmeans(m, ~ Distance, at = list(Distance = "2"), lmer.df = "kenward-roger")
+emm_6 <- emmeans(m, ~ Distance, at = list(Distance = "6"), lmer.df = "kenward-roger")
+# planned tests against 0
+
+test(emm_2, null = 0, side = ">", adjust = "bonferroni")
+test(emm_6, null = 0, side = "<", adjust = "bonferroni")
+
+
+# exploratory two-sided tests at other distances
+emm_4  <- emmeans(m, ~ Distance, at = list(Distance = "4"),  lmer.df = "kenward-roger")
+emm_8  <- emmeans(m, ~ Distance, at = list(Distance = "8"),  lmer.df = "kenward-roger")
+emm_10 <- emmeans(m, ~ Distance, at = list(Distance = "10"), lmer.df = "kenward-roger")
+emm_15 <- emmeans(m, ~ Distance, at = list(Distance = "15"), lmer.df = "kenward-roger")
+emm_20 <- emmeans(m, ~ Distance, at = list(Distance = "20"), lmer.df = "kenward-roger")
+
+test(emm_4,  null = 0)
+test(emm_8,  null = 0)
+test(emm_10, null = 0)
+test(emm_15, null = 0)
+test(emm_20, null = 0)
+
+
+# Q-Q plots of model residuals
+ggplot(data.frame(resid = residuals(m)), aes(sample = resid)) +
+  stat_qq() +
+  stat_qq_line() +
+  theme_minimal() +
+  labs(
+    title = "Q-Q Plot of Model Residuals",
+    x = "Theoretical Quantiles",
+    y = "Model Residuals"
+  )
+
+subject_distance_means <- subject_distance_means %>%
+  mutate(
+    Distance = as.numeric(as.character(Distance))
+  )
+
+subject_distance_means <- subject_distance_means %>%
+  mutate(
+    Distance = as.numeric(as.character(Distance))
+  )
+
+main_spag_plot <- ggplot(
+  subject_distance_means,
+  aes(
+    x = Distance,
+    y = mean_Error,
+    group = ParticipantNumber,
+    color = factor(ParticipantNumber)
+  )
+) +
+  # Individual participant lines
+  geom_line(
+    linewidth = 1.3,
+    alpha = 0.8
+  ) +
+  geom_point(
+    size = 3.5,
+    alpha = 0.9
+  ) +
+  
+  # Red, blue, green participant color theme
+  scale_color_manual(
+    values = rep(
+      c("#D62728", "#1F77B4", "#2CA02C"),
+      10
+    )
+  ) +
+  
+  # Group mean
+  stat_summary(
+    aes(group = 1),
+    fun = mean,
+    geom = "line",
+    linewidth = 2.5,
+    color = "black"
+  ) +
+  stat_summary(
+    aes(group = 1),
+    fun = mean,
+    geom = "point",
+    size = 4.5,
+    color = "black"
+  ) +
+  
+  geom_hline(
+    yintercept = 0,
+    linetype = "dashed",
+    linewidth = 0.9
+  ) +
+  
+  scale_x_continuous(
+    breaks = sort(unique(subject_distance_means$Distance))
+  ) +
+  
+  labs(
+    title = "Mean Error by Triangle Side Length",
+    subtitle = "Colored lines = individual participants; black line = group mean",
+    x = "Triangle Side Length (m)",
+    y = "Mean Error (degrees)"
+  ) +
+  
+  theme_minimal(base_size = 16) +
+  theme(
+    plot.title = element_text(
+      face = "bold",
+      size = 20
+    ),
+    plot.subtitle = element_text(
+      size = 15
+    ),
+    axis.title = element_text(
+      size = 17
+    ),
+    axis.text = element_text(
+      size = 14
+    ),
+    legend.position = "none"
+  )
+
+print(main_spag_plot)
